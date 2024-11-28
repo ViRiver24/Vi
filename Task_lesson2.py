@@ -148,6 +148,8 @@ train_time_start_on_cpu = timer()
 
 # Set the number of epochs (we'll keep this small for faster training times)
 epochs = 3
+loss_train_all = []
+acc_train_all = []
 
 # Create training and testing loop
 for epoch in tqdm(range(epochs)):
@@ -155,6 +157,7 @@ for epoch in tqdm(range(epochs)):
     print(f"Epoch: {epoch}\n-------")
     ### Training
     train_loss = 0
+    train_loss, train_acc = 0, 0
     # Add a loop to loop through training batches
     for batch, (X, y) in enumerate(train_dataloader):
         model_0.train() 
@@ -164,6 +167,8 @@ for epoch in tqdm(range(epochs)):
         # 2. Calculate loss (per batch)
         loss = loss_fn(y_pred, y)
         train_loss += loss # accumulatively add up the loss per epoch 
+        #define accuracy
+        train_acc += accuracy_fn(y_true = y, y_pred = y_pred.argmax(dim=1))
         # 3. Optimizer zero grad
         optimizer.zero_grad()
 
@@ -179,6 +184,7 @@ for epoch in tqdm(range(epochs)):
 
     # Divide total train loss by length of train dataloader (average loss per batch per epoch)
     train_loss /= len(train_dataloader)
+    train_acc /= len(train_dataloader)
     
     ### Testing
     # Setup variables for accumulatively adding up loss and accuracy 
@@ -204,7 +210,8 @@ for epoch in tqdm(range(epochs)):
 
     ## Print out what's happening
     print(f"\nTrain loss: {train_loss:.5f} | Test loss: {test_loss:.5f}, Test acc: {test_acc:.2f}%\n")
-
+    loss_train_all.append(train_loss)
+    acc_train_all.append(train_acc)
 # Calculate training time      
 train_time_end_on_cpu = timer()
 total_train_time_model_0 = print_train_time(start=train_time_start_on_cpu, 
@@ -219,21 +226,21 @@ image, label = test_data[2]
 # Import tqdm for progress bar
 from tqdm.auto import tqdm
 
-# 1. Make predictions with trained model
+    # 1. Make predictions with trained model
 y_preds = []
 model_0.eval()
 with torch.inference_mode():
-  for X, y in tqdm(test_dataloader, desc="Making predictions"):
-    # Send data and targets to target device
-    X, y = X.to("cpu"), y.to("cpu")
-    # Do the forward pass
-    y_logit = model_0(X)
-    # Turn predictions from logits -> prediction probabilities -> predictions labels
-    y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1) # note: perform softmax on the "logits" dimension, not "batch" dimension (in this case we have a batch size of 32, so can perform on dim=1)
-    # Put predictions on CPU for evaluation
-    y_preds.append(y_pred.cpu())
-# Concatenate list of predictions into a tensor
-y_pred_tensor = torch.cat(y_preds)
+    for X, y in tqdm(test_dataloader, desc="Making predictions"):
+        # Send data and targets to target device
+        X, y = X.to("cpu"), y.to("cpu")
+        # Do the forward pass
+        y_logit = model_0(X)
+        # Turn predictions from logits -> prediction probabilities -> predictions labels
+        y_pred = torch.softmax(y_logit, dim=1).argmax(dim=1) # note: perform softmax on the "logits" dimension, not "batch" dimension (in this case we have a batch size of 32, so can perform on dim=1)
+        # Put predictions on CPU for evaluation
+        y_preds.append(y_pred.cpu())
+    # Concatenate list of predictions into a tensor
+    y_pred_tensor = torch.cat(y_preds)
 
 # See if torchmetrics exists, if not, install it
 try:
@@ -335,5 +342,27 @@ for i, sample in enumerate(test_samples):
       plt.title(title_text, fontsize=10, c="r") # red text if wrong
   plt.axis(False);
   plt.show()
+  
+  scalar_loss_list = [t.item() for t in loss_train_all]
 
+
+fig, ax = plt.subplots(1, 2, figsize=(12, 5))  # 1 рядок, 2 стовпці
+
+# Перший графік (Loss)
+ax[0].plot(scalar_loss_list, label='Loss', color='blue')
+ax[0].set_xlabel('Epoch')
+ax[0].set_ylabel('Loss')
+ax[0].set_title('Training Loss')
+ax[0].grid(True)
+
+# Другий графік (Accuracy)
+ax[1].plot(acc_train_all, label='Accuracy', color='orange')
+ax[1].set_xlabel('Epoch')
+ax[1].set_ylabel('Accuracy')
+ax[1].set_title('Training Accuracy')
+ax[1].grid(True)
+
+# Відображення
+plt.tight_layout()  # Для коректного розміщення
+plt.show()
 
